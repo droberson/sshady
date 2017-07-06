@@ -2,9 +2,16 @@
 
 """
 sshady.py -- SSH key harvesting and pivoting things.
+          -- Dropping cyber warheads on digital foreheads.
+          --
           -- by Daniel Roberson @dmfroberson
+
+This is still being worked on, so probably lots of bugs and weirdness.
+
 TODO:
   - Cracking improvements
+    -- -u/-U hydra-style to specify user or list
+    -- -h/-H to specfy single host or list
     -- Determine key type to avoid trying all of them.
     -- threading?
   - Attempt to login to supplied hosts using captured keys
@@ -14,7 +21,7 @@ TODO:
     -- Supply an input list for hosts/usernames
        - Create unique list based on pwent for use on current network
   - Input directory full of keys, or specify /home rather than searching pwents
-  - General cleanup
+  - General cleanup.. globals, super long main(), etc.
 
 Requires:
   - paramiko
