@@ -29,7 +29,6 @@ This tool is currently under development and probably is terrible!
       [+] Success! /home/daniel/.ssh/password:password
 
 [+] Done.
-
 ```
 
 ## Thanks
