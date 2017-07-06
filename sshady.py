@@ -108,7 +108,15 @@ def try_key(keyfile, password=None):
 
 
 def process_key(keyfile):
-    """ docstring
+    """ process_key() -- Determine whether a file is a valid SSH key or not and
+                      -- act accordingly.
+
+    Args:
+        keyfile (str) - Path to file to check
+
+    Returns:
+        True if keyfile is an SSH key.
+        False if keyfile is not an SSH key.
     """
     result = try_key(keyfile)
 
@@ -118,8 +126,10 @@ def process_key(keyfile):
             xprint("    [*] Attempting to crack..")
             crack_key(keyfile, WORDLIST)
     elif result == False:
+        # Probably not an SSH key
         return False
     elif result == None:
+        # No password
         xprint("  [+] %s appears to be a valid, passwordless key" % keyfile)
         terseprint("%s -- No password" % keyfile)
         return True
