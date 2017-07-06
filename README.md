@@ -14,8 +14,9 @@ This tool is currently under development and probably is terrible!
 
 To use this, you must install paramiko via pip or your OS's packaging
 system:
+
 	$ pip install paramiko
-	# apt install python-paramiko
+	$ sudo apt install python-paramiko
 
 ## Example output:
 
