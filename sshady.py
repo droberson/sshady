@@ -5,8 +5,8 @@ sshady.py -- SSH key harvesting things.
           -- by Daniel Roberson @dmfroberson
 TODO:
   - Cracking improvements
-    -- username as pass
-  - Store keys for the future
+    -- Determine key type to avoid trying all of them.
+    -- threading?
 - Attempt to login to supplied hosts using captured keys (nmap output as input!)
 
 Requires:
