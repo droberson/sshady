@@ -7,9 +7,15 @@ used in a few ways:
 - As a security tool, ran from cron at set intervals to alert systems
   administrators of users with weak keys.
 
-- Offensively to check if the user has installed these keys elsewhere.
+- Offensively to check if the user has installed these weak keys
+  elsewhere. A good place to look would be their shell's history file.
 
 This tool is currently under development and probably is terrible!
+
+To use this, you must install paramiko via pip or your OS's packaging
+system:
+	$ pip install paramiko
+	# apt install python-paramiko
 
 ## Example output:
 
