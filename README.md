@@ -14,7 +14,7 @@ This tool is currently under development and probably is terrible!
 ## Example output:
 
 ```
-[+] Searching for passwordless SSH keys
+[+] Searching for SSH keys..
 
 [*] Found .ssh directory for user daniel: /home/daniel/.ssh
   [+] /home/daniel/.ssh/id_rsa appears to be a valid key
