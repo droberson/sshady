@@ -25,51 +25,89 @@ import paramiko
 WORDLIST = "words.txt"
 
 def crack_key(keyfile, wordlist):
-    ssh_key_types = [paramiko.RSAKey.from_private_key_file,
-                     paramiko.DSSKey.from_private_key_file,
-                     paramiko.ECDSAKey.from_private_key_file]
+    """ crack_key() -- Launches a wordlist attack against SSH key
 
+    Args:
+        keyfile (str)  - Path to SSH private key.
+        wordlist (str) - Path to wordlist.
+
+    Returns:
+        True if the password has been discovered.
+        False if the password has not been discovered.
+    """
     with open(wordlist) as passwords:
         for password in passwords:
-            for key_type in ssh_key_types:
-                password = password.rstrip()
-                if not password:
-                    continue
+            password = password.rstrip()
+            if not password:
+                continue
 
-                try:
-                    key_type(keyfile, password=password)
-                except paramiko.ssh_exception.SSHException:
-                    continue
-                print "      [+] Success! %s:%s" % (keyfile, password)
+            result = try_key(keyfile, password)
+            if type(result) == str:
+                print "      [+] Success! %s:%s" % (keyfile, result)
                 return True
+
+    print "      [-] Unable to crack SSH key with supplied wordlist."
     return False
 
 
-def try_key(keyfile):
+def try_key(keyfile, password=None):
+    """ try_key() -- Tries to use an SSH key.
+
+    Args:
+        keyfile (str)  - Path to SSH private key
+        password (str) - Password to attempt. Default None.
+
+    Returns:
+        True if it is a valid key, but the wrong password was supplied.
+        False if it is not a valid key.
+        The password if it is a valid key and password.
+    """
     ssh_key_types = [paramiko.RSAKey.from_private_key_file,
                      paramiko.DSSKey.from_private_key_file,
                      paramiko.ECDSAKey.from_private_key_file]
 
     for key_type in ssh_key_types:
         try:
-            key_type(keyfile)
+            key_type(keyfile, password=password)
         except paramiko.ssh_exception.PasswordRequiredException:
-            # Valid key, but requires a password. Skip.
-            print "  [-] %s appears to be a valid key" % keyfile
-            print "    [*] Attempting to crack SSH key.."
-            crack_key(keyfile, WORDLIST)
-
-            continue
+            # Valid key, but wrong password
+            return True
         except paramiko.ssh_exception.SSHException:
-            # Probably not a valid key at all. Skip.
-            continue
+            return False
+        return password
 
+    return False
+
+
+def process_key(keyfile):
+    """ docstring
+    """
+    result = try_key(keyfile)
+
+    if result == True:
+        print "  [+] %s appears to be a valid key" % keyfile
+        print "    [*] Attempting to crack.."
+        # TODO add flag to skip cracking
+        crack_key(keyfile, WORDLIST)
+    elif result == False:
+        return False
+    elif result == None:
         print "  [+] %s appears to be a valid, passwordless key" % keyfile
+        return True
 
-    return
+    return True
 
 
 def main():
+    """ main() -- entry point of program
+
+    Args:
+        None
+
+    Returns:
+        os.EX_OK on successful run
+        os_EX_USAGE on failed run
+    """
     print "[+] Searching for passwordless SSH keys"
     print
 
@@ -82,12 +120,12 @@ def main():
             for root, _, filenames in os.walk(sshdir):
                 for filename in filenames:
                     checkfile = os.path.join(root, filename)
-                    try_key(checkfile)
+                    process_key(checkfile)
 
     print
     print "[+] Done."
-    return
+    return os.EX_OK
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())
