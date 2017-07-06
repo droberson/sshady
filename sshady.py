@@ -75,6 +75,8 @@ def crack_key(keyfile, wordlist):
                 return True
 
     xprint("      [-] Unable to crack SSH key with supplied wordlist.")
+    terseprint(keyfile)
+
     return False
 
 
@@ -125,13 +127,15 @@ def process_key(keyfile):
         if CRACK:
             xprint("    [*] Attempting to crack..")
             crack_key(keyfile, WORDLIST)
+        else:
+            terseprint(keyfile)
     elif result == False:
         # Probably not an SSH key
         return False
     elif result == None:
         # No password
         xprint("  [+] %s appears to be a valid, passwordless key" % keyfile)
-        terseprint("%s" % keyfile)
+        terseprint("%s -- NO PASSWORD" % keyfile)
         return True
 
     return True
