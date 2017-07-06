@@ -199,6 +199,8 @@ def try_ssh_key_login(username, keyfile, password, host, port=22):
     # TODO: make sure this is valid. (try DSS, etc)
     key = paramiko.RSAKey.from_private_key_file(keyfile, password=password)
 
+    paramiko.util.log_to_file("/dev/null")
+
     try:
         client.connect(
             host,
