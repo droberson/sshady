@@ -53,7 +53,7 @@ def terseprint(message):
         print message
 
 
-def crack_key(keyfile, wordlist):
+def crack_key(keyfile, username, wordlist):
     """ crack_key() -- Launches a wordlist attack against SSH key
 
     Args:
@@ -64,6 +64,14 @@ def crack_key(keyfile, wordlist):
         True if the password has been discovered.
         False if the password has not been discovered.
     """
+    # Try username as password first
+    result = try_key(keyfile, username)
+    if type(result) == str:
+        xprint("      [+] Success! %s:%s" % (keyfile, username))
+        terseprint("%s %s" % (keyfile, username))
+        return True
+
+    # Try with wordlist.
     with open(wordlist) as passwords:
         for password in passwords:
             password = password.rstrip()
@@ -133,9 +141,10 @@ def process_key(keyfile, username):
                                    (username, os.path.basename(keyfile)))
             shutil.copy2(keyfile, outfile)
 
+        # Crack passwords, if asked.
         if CRACK:
             xprint("    [*] Attempting to crack..")
-            crack_key(keyfile, WORDLIST)
+            crack_key(keyfile, username, WORDLIST)
         else:
             terseprint(keyfile)
     elif result == False:
