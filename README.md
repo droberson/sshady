@@ -43,5 +43,6 @@ system:
 Daniel Miessler for SecLists:
 https://github.com/danielmiessler/SecLists
 
-I used the 10k most common passwords list in that repo as "words.txt"
+I used the 10k most common passwords list in that repo as
+"wordlist.txt"
 
