@@ -4,12 +4,7 @@
 sshady.py -- SSH key pivoting things.
           -- by Daniel Roberson @dmfroberson
 TODO:
-  - argparse
-    -- specify wordlist
-    -- pre-stored BS passwords
-    -- --terse flag for use in cron.daily
   - Cracking improvements
-    -- common passwords
     -- username as pass
   - Store keys for the future
 - Attempt to login to supplied hosts using captured keys (nmap output as input!)
@@ -20,9 +15,41 @@ Requires:
 
 import os
 import pwd
+import argparse
 import paramiko
 
-WORDLIST = "words.txt"
+
+# Globals
+WORDLIST = "wordlist.txt"
+TERSE = False
+CRACK = True
+
+
+def xprint(message):
+    """ xprint() -- Wrapper for print function that honors terse setting
+
+    Args:
+        message (str) - String to output
+
+    Returns:
+        Nothing
+    """
+    if not TERSE:
+        print message
+
+
+def terseprint(message):
+    """ terseprint() -- Wrapper for print function that displays terse messages
+
+    Args:
+        message (str) - String to output
+
+    Returns:
+        Nothing
+    """
+    if TERSE:
+        print message
+
 
 def crack_key(keyfile, wordlist):
     """ crack_key() -- Launches a wordlist attack against SSH key
@@ -43,10 +70,11 @@ def crack_key(keyfile, wordlist):
 
             result = try_key(keyfile, password)
             if type(result) == str:
-                print "      [+] Success! %s:%s" % (keyfile, result)
+                xprint("      [+] Success! %s:%s" % (keyfile, result))
+                terseprint("%s:%s" % (keyfile, result))
                 return True
 
-    print "      [-] Unable to crack SSH key with supplied wordlist."
+    xprint("      [-] Unable to crack SSH key with supplied wordlist.")
     return False
 
 
@@ -85,17 +113,51 @@ def process_key(keyfile):
     result = try_key(keyfile)
 
     if result == True:
-        print "  [+] %s appears to be a valid key" % keyfile
-        print "    [*] Attempting to crack.."
-        # TODO add flag to skip cracking
-        crack_key(keyfile, WORDLIST)
+        xprint("  [+] %s appears to be a valid key" % keyfile)
+        if CRACK:
+            xprint("    [*] Attempting to crack..")
+            crack_key(keyfile, WORDLIST)
     elif result == False:
         return False
     elif result == None:
-        print "  [+] %s appears to be a valid, passwordless key" % keyfile
+        xprint("  [+] %s appears to be a valid, passwordless key" % keyfile)
+        terseprint("%s -- No password" % keyfile)
         return True
 
     return True
+
+
+def parse_cli():
+    """ parse_cli() -- Parse CLI input
+
+    Args:
+        None
+
+    Returns:
+        ArgumentParser namespace relevant to supplied CLI options
+    """
+    description = "example: ./sshady.py"
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("-t",
+                        "--terse",
+                        help="Toggles terse output (useful for scripting)",
+                        action="store_true",
+                        required=False,
+                        default=False)
+    parser.add_argument("-w",
+                        "--wordlist",
+                        help="Specify wordlist to use. Default: %s" % WORDLIST,
+                        default=WORDLIST,
+                        required=False)
+    parser.add_argument("-n",
+                        "--nocrack",
+                        help="Don't attempt to crack SSH keys.",
+                        action="store_false",
+                        required=False,
+                        default=True)
+
+    args = parser.parse_args()
+    return args
 
 
 def main():
@@ -108,23 +170,43 @@ def main():
         os.EX_OK on successful run
         os_EX_USAGE on failed run
     """
-    print "[+] Searching for SSH keys.."
-    print
+    global WORDLIST
+    global TERSE
+    global CRACK
+
+    args = parse_cli()
+    WORDLIST = args.wordlist
+    TERSE = args.terse
+    CRACK = args.nocrack
+
+    xprint("[+] sshady.py -- by Daniel Roberson @dmfroberson")
+    xprint("")
+
+    if not os.access(WORDLIST, os.R_OK):
+        xprint("[-] Unable to open wordlist %s for reading" % WORDLIST)
+        xprint("[-] Exiting.")
+        terseprint("Unable to open wordlist %s for reading. Exiting." % \
+                   WORDLIST)
+        return os.EX_USAGE
+
+    xprint("[+] Searching for SSH keys..")
+    xprint("")
 
     for pwent in pwd.getpwall():
         user = pwent[0]
         sshdir = os.path.join(os.path.expanduser("~%s" % user), ".ssh")
 
         if os.path.isdir(sshdir):
-            print "[*] Found .ssh directory for user %s: %s" % (user, sshdir)
+            xprint("[*] Found .ssh directory for user %s: %s" % (user, sshdir))
             for root, _, filenames in os.walk(sshdir):
                 for filename in filenames:
                     checkfile = os.path.join(root, filename)
                     process_key(checkfile)
 
-    print
-    print "[+] You must defeat Sheng Long to stand a chance."
-    print "[+] Done."
+    xprint("")
+    xprint("[+] You must defeat Sheng Long to stand a chance.")
+    xprint("[+] Done.")
+
     return os.EX_OK
 
 
