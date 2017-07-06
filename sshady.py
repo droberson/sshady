@@ -123,6 +123,7 @@ def main():
                     process_key(checkfile)
 
     print
+    print "[+] You must defeat Sheng Long to stand a chance."
     print "[+] Done."
     return os.EX_OK
 
