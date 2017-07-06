@@ -108,7 +108,7 @@ def main():
         os.EX_OK on successful run
         os_EX_USAGE on failed run
     """
-    print "[+] Searching for passwordless SSH keys"
+    print "[+] Searching for SSH keys.."
     print
 
     for pwent in pwd.getpwall():
