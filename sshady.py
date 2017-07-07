@@ -253,6 +253,24 @@ def try_ssh_key_login(username, keyfile, password, host, port=22):
     return True
 
 
+def find_ssh_directories():
+    for pwent in pwd.getpwall():
+        user = pwent[0]
+        sshdir = os.path.join(os.path.expanduser("~%s" % user), ".ssh")
+
+        if os.path.isdir(sshdir):
+            xprint("[*] Found .ssh directory for user %s: %s" % (user, sshdir))
+            for root, _, filenames in os.walk(sshdir):
+                for filename in filenames:
+                    checkfile = os.path.join(root, filename)
+                    process_key(checkfile, user)
+
+    xprint("")
+    xprint("[+] %s keys discovered." % len(VALID_KEYS))
+
+    return True
+
+
 def parse_cli():
     """ parse_cli() -- Parse CLI input
 
@@ -355,19 +373,7 @@ def main():
     xprint("")
 
     # Search for users passwords.
-    for pwent in pwd.getpwall():
-        user = pwent[0]
-        sshdir = os.path.join(os.path.expanduser("~%s" % user), ".ssh")
-
-        if os.path.isdir(sshdir):
-            xprint("[*] Found .ssh directory for user %s: %s" % (user, sshdir))
-            for root, _, filenames in os.walk(sshdir):
-                for filename in filenames:
-                    checkfile = os.path.join(root, filename)
-                    process_key(checkfile, user)
-
-    xprint("")
-    xprint("[+] %s keys discovered." % len(VALID_KEYS))
+    find_ssh_directories()
 
     # If a hostfile is specified, loop through hosts and try to login with
     # each of the harvested keys.
