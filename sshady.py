@@ -46,6 +46,20 @@ USERS = ["root", "nagios", "admin", "guest", "www", "www-data", "rsync"]
 VALID_KEYS = []
 
 
+class Color(object):
+    BOLD = "\033[1m"
+    END = "\033[0m"
+
+    @staticmethod
+    def disable():
+        Color.BOLD = ""
+        Color.END = ""
+
+    @staticmethod
+    def bold_string(buf):
+        return Color.BOLD + buf + Color.END
+
+
 def xprint(message):
     """ xprint() -- Wrapper for print function that honors terse setting
 
@@ -86,7 +100,8 @@ def crack_key(keyfile, username, wordlist):
     # Try username as password first
     result = try_key(keyfile, username)
     if type(result) == str:
-        xprint("      [+] Success! %s:%s" % (keyfile, username))
+        xprint(Color.bold_string(
+            "      [+] Success! %s:%s" % (keyfile, username)))
         terseprint("%s %s" % (keyfile, username))
         VALID_KEYS.append((username, keyfile, username))
         return True
@@ -100,7 +115,8 @@ def crack_key(keyfile, username, wordlist):
 
             result = try_key(keyfile, password)
             if type(result) == str:
-                xprint("      [+] Success! %s:%s" % (keyfile, result))
+                xprint(Color.bold_string(
+                    "      [+] Success! %s:%s" % (keyfile, result)))
                 terseprint("%s %s" % (keyfile, result))
                 VALID_KEYS.append((username, keyfile, result))
                 return True
@@ -254,6 +270,7 @@ def try_ssh_key_login(username, keyfile, password, host, port=22):
 
 
 def find_ssh_directories():
+    # TODO: search /home for orphaned home directories that may contain keys
     for pwent in pwd.getpwall():
         user = pwent[0]
         sshdir = os.path.join(os.path.expanduser("~%s" % user), ".ssh")
@@ -314,8 +331,16 @@ def parse_cli():
                         help="File containing list of usernames to try",
                         required=False,
                         default=None)
+    parser.add_argument("--nocolor",
+                        help="Disable ANSI color code output",
+                        required=False,
+                        action="store_true")
 
     args = parser.parse_args()
+
+    if args.nocolor:
+        Color.disable()
+
     return args
 
 
@@ -370,9 +395,9 @@ def main():
         return os.EX_USAGE
 
     xprint("[+] Searching for SSH keys..")
-    xprint("")
 
     # Search for users passwords.
+    # TODO don't do this if key directory is specified.
     find_ssh_directories()
 
     # If a hostfile is specified, loop through hosts and try to login with
