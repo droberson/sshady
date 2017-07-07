@@ -35,7 +35,7 @@ import paramiko
 
 
 # Globals/Settings
-WORDLIST = "wordlist.txt"
+#WORDLIST = "wordlist.txt"
 TERSE = False
 CRACK = True
 OUTDIR = None
@@ -45,6 +45,22 @@ USERFILE = None
 USERS = ["root", "nagios", "admin", "guest", "www", "www-data", "rsync"]
 VALID_KEYS = []
 
+
+class Settings(object):
+    WORDLIST = "wordlist.txt"
+
+    @staticmethod
+    def update_wordlist(wordlist):
+        WORDLIST = wordlist
+
+        # Make sure wordlist is readable.
+        if not os.access(WORDLIST, os.R_OK):
+            xprint("[-] Unable to open wordlist %s for reading" % WORDLIST)
+            xprint("[-] Exiting.")
+            terseprint("Unable to open wordlist %s for reading. Exiting." % \
+                       WORDLIST)
+            return False
+        return True
 
 class Color(object):
     """ Color Object
@@ -226,7 +242,7 @@ def process_key(keyfile, username):
         # Crack passwords, if asked.
         if CRACK:
             xprint("    [*] Attempting to crack..")
-            crack_key(keyfile, username, WORDLIST)
+            crack_key(keyfile, username, Settings.WORDLIST)
         else:
             terseprint(keyfile)
     elif result == False:
@@ -335,9 +351,10 @@ def parse_cli():
                         default=False)
     parser.add_argument("-w",
                         "--wordlist",
-                        help="Specify wordlist to use. Default: %s" % WORDLIST,
+                        help="Specify wordlist to use. Default: %s" % \
+                        Settings.WORDLIST,
                         required=False,
-                        default=WORDLIST)
+                        default=Settings.WORDLIST)
     parser.add_argument("-n",
                         "--nocrack",
                         help="Don't attempt to crack SSH keys.",
@@ -382,7 +399,7 @@ def main():
         os.EX_OK on successful run
         os_EX_USAGE on failed run
     """
-    global WORDLIST
+    #global WORDLIST
     global TERSE
     global CRACK
     global OUTDIR
@@ -394,20 +411,24 @@ def main():
     xprint("")
 
     args = parse_cli()
-    WORDLIST = args.wordlist
+
+    if not Settings.update_wordlist(args.wordlist):
+        return os.EX_USAGE
+    
+    #WORDLIST = args.wordlist
     TERSE = args.terse
     CRACK = args.nocrack
     OUTDIR = args.directory
     HOSTFILE = args.hosts
     USERFILE = args.users
 
-    # Make sure wordlist is readable.
-    if not os.access(WORDLIST, os.R_OK):
-        xprint("[-] Unable to open wordlist %s for reading" % WORDLIST)
-        xprint("[-] Exiting.")
-        terseprint("Unable to open wordlist %s for reading. Exiting." % \
-                   WORDLIST)
-        return os.EX_USAGE
+    # # Make sure wordlist is readable.
+    # if not os.access(WORDLIST, os.R_OK):
+    #     xprint("[-] Unable to open wordlist %s for reading" % WORDLIST)
+    #     xprint("[-] Exiting.")
+    #     terseprint("Unable to open wordlist %s for reading. Exiting." % \
+    #                WORDLIST)
+    #     return os.EX_USAGE
 
     # Make sure output directory is writable.
     if OUTDIR and not os.path.isdir(OUTDIR):
