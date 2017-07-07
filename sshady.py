@@ -111,6 +111,32 @@ def crack_key(keyfile, username, wordlist):
     return False
 
 
+def get_key_type(keyfile):
+    """ get_key_type() -- determines which type of SSH key a keyfile is
+
+    Args:
+        keyfile (str) - Path to SSH key file
+
+    Returns:
+        paramiko from_private_key_file relevant to keyfile on success
+        None if this function was unable to determine key type.
+    """
+    ssh_key_types = [paramiko.RSAKey.from_private_key_file,
+                     paramiko.DSSKey.from_private_key_file,
+                     paramiko.ECDSAKey.from_private_key_file]
+
+    for key_type in ssh_key_types:
+        try:
+            key_type(keyfile)
+        except paramiko.ssh_exception.PasswordRequiredException:
+            return key_type
+        except paramiko.ssh_exception.SSHException:
+            return None
+        return key_type
+
+    return None
+
+
 def try_key(keyfile, password=None):
     """ try_key() -- Tries to use an SSH key.
 
@@ -123,21 +149,21 @@ def try_key(keyfile, password=None):
         False if it is not a valid key.
         The password if it is a valid key and password.
     """
-    ssh_key_types = [paramiko.RSAKey.from_private_key_file,
-                     paramiko.DSSKey.from_private_key_file,
-                     paramiko.ECDSAKey.from_private_key_file]
+    key_type = get_key_type(keyfile)
 
-    for key_type in ssh_key_types:
-        try:
-            key_type(keyfile, password=password)
-        except paramiko.ssh_exception.PasswordRequiredException:
-            # Valid key, but wrong password
-            return True
-        except paramiko.ssh_exception.SSHException:
-            return False
-        return password
+    if key_type is None:
+        return False
 
-    return False
+    try:
+        key_type(keyfile, password=password)
+    except paramiko.ssh_exception.PasswordRequiredException:
+        # Valid key, wrong password
+        return True
+    except paramiko.ssh_exception.SSHException:
+        # Key doesn't work here
+        return False
+
+    return password
 
 
 def process_key(keyfile, username):
