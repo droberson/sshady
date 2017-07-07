@@ -131,7 +131,8 @@ def get_key_type(keyfile):
         except paramiko.ssh_exception.PasswordRequiredException:
             return key_type
         except paramiko.ssh_exception.SSHException:
-            return None
+            continue
+
         return key_type
 
     return None
@@ -222,9 +223,14 @@ def try_ssh_key_login(username, keyfile, password, host, port=22):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    # TODO: make sure this is valid. (try DSS, etc)
-    key = paramiko.RSAKey.from_private_key_file(keyfile, password=password)
+    key_type = get_key_type(keyfile)
+    if key_type is None:
+        # Not a valid key
+        return False
 
+    key = key_type(keyfile, password=password)
+
+    # Supress error messages. TODO: figure out if there's a better way.
     paramiko.util.log_to_file("/dev/null")
 
     try:
