@@ -12,7 +12,6 @@ TODO:
   - Cracking improvements
     -- -u/-U hydra-style to specify user or list
     -- -h/-H to specfy single host or list
-    -- Determine key type to avoid trying all of them.
     -- threading?
   - Attempt to login to supplied hosts using captured keys
     -- Nmap XML/greppable output as input?
@@ -21,7 +20,6 @@ TODO:
     -- Supply an input list for hosts/usernames
        - Create unique list based on pwent for use on current network
   - Input directory full of keys, or specify /home rather than searching pwents
-  - General cleanup.. globals, super long main(), etc.
   - SIGINT handler
 
 Requires:
@@ -33,10 +31,6 @@ import pwd
 import shutil
 import argparse
 import paramiko
-
-
-# Globals/Settings
-#HOSTFILE = None
 
 VALID_KEYS = []
 
@@ -65,6 +59,7 @@ class Settings(object):
 
     hosts = []
     users = ["root", "nagios", "admin", "guest", "www", "www-data", "rsync"]
+
 
     @staticmethod
     def config(name):
@@ -153,6 +148,7 @@ class Settings(object):
 
         return True
 
+
     @staticmethod
     def update_user_file(userfile):
         """ Settings.update_user_file() -- Updates userfile setting
@@ -232,6 +228,7 @@ class Color(object):
         """
         Color.BOLD = ""
         Color.END = ""
+
 
     @staticmethod
     def bold_string(buf):
