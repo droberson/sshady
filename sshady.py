@@ -4,7 +4,7 @@
 sshady.py -- SSH key harvesting and pivoting things.
           -- Dropping cyber warheads on digital foreheads.
           --
-          -- by Daniel Roberson @dmfroberson
+          -- by Daniel Roberson @dmfroberson July/2017
 
 This is still being worked on, so probably lots of bugs and weirdness.
 
@@ -47,16 +47,34 @@ VALID_KEYS = []
 
 
 class Color(object):
+    """ Color Object
+    """
     BOLD = "\033[1m"
     END = "\033[0m"
 
     @staticmethod
     def disable():
+        """ Color.disable() -- Disable color output"
+
+        Args:
+            None
+
+        Returns:
+            Nothing
+        """
         Color.BOLD = ""
         Color.END = ""
 
     @staticmethod
     def bold_string(buf):
+        """ Color.bold_string() -- Wrap a string in ANSI codes to make it bold
+
+        Args:
+            buf (str) - String to wrap
+
+        Returns:
+            A string encapsulated in ANSI codes to make it bold
+        """
         return Color.BOLD + buf + Color.END
 
 
@@ -270,6 +288,16 @@ def try_ssh_key_login(username, keyfile, password, host, port=22):
 
 
 def find_ssh_directories():
+    """ find_ssh_directories() -- Search pwents for home directories with .ssh
+            directories. Scans each file in .ssh directory for valid SSH keys.
+            Valid keys are added to VALID_KEYS list.
+
+    Args:
+        None
+
+    Returns:
+        True
+    """
     # TODO: search /home for orphaned home directories that may contain keys
     for pwent in pwd.getpwall():
         user = pwent[0]
@@ -362,6 +390,9 @@ def main():
     global HOSTFILE
     global USERFILE
 
+    xprint("[+] sshady.py -- by Daniel Roberson @dmfroberson")
+    xprint("")
+
     args = parse_cli()
     WORDLIST = args.wordlist
     TERSE = args.terse
@@ -369,9 +400,6 @@ def main():
     OUTDIR = args.directory
     HOSTFILE = args.hosts
     USERFILE = args.users
-
-    xprint("[+] sshady.py -- by Daniel Roberson @dmfroberson")
-    xprint("")
 
     # Make sure wordlist is readable.
     if not os.access(WORDLIST, os.R_OK):
