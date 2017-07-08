@@ -511,14 +511,16 @@ def attempt_ssh_logins():
 
             # Try username first
             if try_ssh_key_login(username, keyfile, password, host, port):
-                xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
-                       (username, host, keyfile, password))
+                xprint(Color.bold_string(
+                    "    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
+                    (username, host, keyfile, password)))
 
             # Try list of usernames now.
             for user in Settings.users:
                 if try_ssh_key_login(user, keyfile, password, host, port):
-                    xprint("    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
-                           (user, host, keyfile, password))
+                    xprint(Color.bold_string(
+                        "    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
+                        (user, host, keyfile, password)))
 
     return True
 
