@@ -5,7 +5,9 @@ with weak passphrases or no passphrase at all. This information can be
 used in a few ways:
 
 - As a security tool, ran from cron at set intervals to alert systems
-  administrators of users with weak keys.
+  administrators of users with weak keys:
+
+	$ ./sshady.py --terse
 
 - Offensively to check if the user has installed these weak keys
   elsewhere. A good place to look would be their shell's history file.
