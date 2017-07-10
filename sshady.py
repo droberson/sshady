@@ -221,6 +221,7 @@ class Settings(object):
             True if the setting is valid and the input file is readable.
             False if the input file cannot be read.
         """
+        # hostfile wasn't set with CLI. Nothing to do here.
         if not hostfile:
             return True
 
