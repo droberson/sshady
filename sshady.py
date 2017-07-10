@@ -517,6 +517,10 @@ def attempt_ssh_logins():
 
             # Try list of usernames now.
             for user in Settings.users:
+                # Skip if user equals username, because this was tried first.
+                if user == username:
+                    continue
+
                 if try_ssh_key_login(user, keyfile, password, host, port):
                     xprint(Color.bold_string(
                         "    [+] %s@%s -- %s:%s LOGIN SUCCESSFUL!" % \
