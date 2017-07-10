@@ -198,12 +198,13 @@ class Settings(object):
             xprint("  [-] Exiting.")
             return False
 
+        # Make sure that at least one username was supplied
         if len(Settings.users) > 0:
             return True
 
-        xprint("[-] Userlist %s contains no valid usernames." % userfile)
+        xprint("[-] User list %s contains no valid usernames." % userfile)
         xprint("[-] Exiting.")
-        terseprint("Userlist %s contains no valid usernames. Exiting." % \
+        terseprint("User list %s contains no valid usernames. Exiting." % \
                    userfile)
         return False
 
@@ -220,7 +221,6 @@ class Settings(object):
             True if the setting is valid and the input file is readable.
             False if the input file cannot be read.
         """
-        # TODO: handle empty files.
         if not hostfile:
             return True
 
@@ -236,7 +236,14 @@ class Settings(object):
             xprint("  [-] Exiting.")
             return False
 
-        return True
+        # Make sure that at least one host was supplied
+        if len(Settings.hosts) > 0:
+            return True
+
+        xprint("[-] Host list %s contains no valid hosts." % hostfile)
+        xprint("[-] Exiting.")
+        terseprint("Host list %s contains no valid hosts. Exiting." % hostfile)
+        return False
 
 
 class Color(object):
