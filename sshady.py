@@ -19,7 +19,10 @@ TODO:
     -- Supply an input list for hosts/usernames
        - Create unique list based on pwent for use on current network
   - Input directory full of keys, or specify /home rather than searching pwents
-  - SIGINT handler
+  - Ability to specify single key location, hosts, usernames and not search for
+    keys locally.
+  - Show elapsed time
+  - Ability to scan slower to not trip fail2ban setups.
 
 Requires:
   - paramiko
@@ -28,6 +31,7 @@ Requires:
 import os
 import pwd
 import shutil
+import signal
 import argparse
 import paramiko
 
@@ -529,6 +533,13 @@ def attempt_ssh_logins():
     return True
 
 
+def sigint_handler(signum, frame):
+    """ sigint_handler() -- Generic SIGINT handler
+    """
+    xprint("[-] Caught SIGINT.")
+    xprint("[-] Exiting..")
+    exit(os.EX_USAGE)
+
 def parse_cli():
     """ parse_cli() -- Parse CLI input
 
@@ -593,6 +604,8 @@ def main():
         os.EX_OK on successful run
         os_EX_USAGE on failed run
     """
+    signal.signal(signal.SIGINT, sigint_handler)
+
     args = parse_cli()
 
     if args.nocolor:
