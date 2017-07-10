@@ -182,7 +182,7 @@ class Settings(object):
             True if the setting is valid and the input file is readable.
             False if the user file cannot be read.
         """
-        # TODO: handle empty files.
+        # Userfile not specified by options, so use defaults.
         if not userfile:
             return True
 
@@ -198,7 +198,14 @@ class Settings(object):
             xprint("  [-] Exiting.")
             return False
 
-        return True
+        if len(Settings.users) > 0:
+            return True
+
+        xprint("[-] Userlist %s contains no valid usernames." % userfile)
+        xprint("[-] Exiting.")
+        terseprint("Userlist %s contains no valid usernames. Exiting." % \
+                   userfile)
+        return False
 
 
     @staticmethod
