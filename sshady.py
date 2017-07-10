@@ -397,8 +397,11 @@ def process_key(keyfile, username):
 
     Returns:
         True if keyfile is an SSH key.
-        False if keyfile is not an SSH key.
+        False if keyfile is unreadable or not an SSH key.
     """
+    if not os.access(keyfile, os.R_OK):
+        return False
+
     result = try_key(keyfile)
 
     if result == True:
