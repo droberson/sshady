@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 sshady.py -- SSH key harvesting and pivoting things.
           -- Dropping cyber warheads on digital foreheads.
@@ -481,7 +480,8 @@ def find_ssh_directories():
                     process_key(checkfile, user)
 
     xprint("")
-    xprint("[+] %s usable keys discovered." % len(VALID_KEYS))
+    xprint("[+] %s usable %s discovered." %
+           (len(VALID_KEYS), "keys" if len(VALID_KEYS) > 1 else "key"))
 
     return True
 
