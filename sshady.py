@@ -106,7 +106,6 @@ class Settings(object):
             True if the wordlist is accessible.
             False if the wordlist is not accessible.
         """
-        # TODO: handle empty files
         Settings.set("wordlist", wordlist)
 
         # Make sure wordlist is readable.
@@ -116,8 +115,28 @@ class Settings(object):
             terseprint("Unable to open wordlist %s for reading. Exiting." % \
                        wordlist)
             return False
-        return True
 
+        # Search for at least one non-blank line in wordlist
+        count = 0
+        with open(wordlist) as linecount:
+            for word in linecount:
+                word = word.rstrip()
+
+                # Skip blank lines
+                if not word:
+                    continue
+
+                # Found a valid line. Exit the loop
+                count += 1
+                break
+
+        if count > 0:
+            return True
+
+        xprint("[-] Wordlist %s contains no valid words." % wordlist)
+        xprint("[-] Exiting.")
+        terseprint("Wordlist %s contains no valid words. Exiting." % wordlist)
+        return False
 
     @staticmethod
     def update_output_directory(directory):
